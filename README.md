@@ -1,5 +1,7 @@
 # LAN im server
 
+![build](https://github.com/Tramis/simple-im/actions/workflows/rust.yml/badge.svg)
+
 just for practice
 
 ## TODO
