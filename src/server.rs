@@ -117,14 +117,21 @@ impl Actor for ChatServer {
 impl Handler<Connect> for ChatServer {
     type Result = usize;
 
-    fn handle(&mut self, msg: Connect, _: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: Connect, cx: &mut Context<Self>) -> Self::Result {
         // notify all users in same room
-        self.send_message("main", "Someone joined");
+        self.send_message("main", "someone joined");
 
         // register session with random id
-        let id = self.id_allocator.lock().unwrap().get();
 
-        info!("Someone joined. id: {id}");
+        let id = match self.id_allocator.lock() {
+            Ok(mut v) => v.get(),
+            Err(e) => {
+                error!("mutex lock error: {e}");
+                return 0;
+            }
+        };
+
+        info!("id: {id} joined.");
 
         self.sessions.insert(id, msg.addr);
 
@@ -144,9 +151,12 @@ impl Handler<Disconnect> for ChatServer {
     type Result = ();
 
     fn handle(&mut self, msg: Disconnect, _: &mut Context<Self>) {
-        info!("Someone disconnected. id: {}", msg.id);
+        info!("id: {} disconnected.", msg.id);
 
-        self.id_allocator.lock().unwrap().remove(msg.id);
+        match self.id_allocator.lock() {
+            Ok(mut v) => v.remove(msg.id),
+            Err(e) => error!("mutex lock error: {e}"),
+        }
 
         let mut rooms: Vec<String> = Vec::new();
 
@@ -161,7 +171,7 @@ impl Handler<Disconnect> for ChatServer {
         }
         // send message to other users
         for room in rooms {
-            self.send_message(&room, "Someone disconnected");
+            self.send_message(&room, "someone disconnected");
         }
     }
 }
@@ -208,7 +218,7 @@ impl Handler<Join> for ChatServer {
         }
         // send message to other users
         for room in rooms {
-            self.send_message(&room, "Someone disconnected");
+            self.send_message(&room, &format!("id: {id} disconnected"));
         }
 
         self.rooms
@@ -216,6 +226,6 @@ impl Handler<Join> for ChatServer {
             .or_insert_with(HashSet::new)
             .insert(id);
 
-        self.send_message(&name, "Someone connected");
+        self.send_message(&name, &format!("id: {id} disconnected"));
     }
 }
