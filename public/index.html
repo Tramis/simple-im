@@ -1,0 +1,117 @@
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+
+    <link href="./static/bootstrap.min.css" rel="stylesheet">
+    <script src="./static/bootstrap.min.js"></script>
+
+    <style>
+        .h-5 {
+            height: 5%;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container h-100">
+        <div class="h-5"></div>
+        <div class="input-group">
+            <span class="input-group-text">With textarea</span>
+            <textarea id="chat-input" class="form-control" aria-label="With textarea"></textarea>
+            <button id="send" class="btn btn-outline-secondary" type="button">send</button>
+        </div>
+        <table class="table table-success table-striped">
+            <thead>
+                <tr>
+                    <th scope="col">...</th>
+                </tr>
+            </thead>
+            <tbody id="table">
+                <tr>
+                    <td>Otto</td>
+                </tr>
+                <tr>
+                    <td>Thornton</td>
+                </tr>
+                <tr>
+                    <td>Larry the Bird</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        // common
+        let log = (msg) => {
+            console.log(msg)
+        }
+
+        // ui elements
+        const $chat_input = document.querySelector('#chat-input')
+        const $table = document.querySelector('#table')
+        const $btn_send = document.querySelector('#send')
+
+        // websocket part
+        var socket = null
+
+        let connect = () => {
+            const { location } = this.window
+            const proto = location.protocol.startsWith('https') ? 'wss' : 'ws'
+            const WS_URI = `${proto}://${location.host}/ws`
+
+            log('Connecting...')
+            socket = new WebSocket(WS_URI)
+
+            socket.onopen = () => {
+                log('Connected')
+                updateConnectionStatus()
+            }
+
+            socket.onmessage = (ev) => {
+                let make_msg = (msg) => {
+                    let tr = document.createElement("tr")
+                    tr.innerHTML = "<td> " + msg + " </td>"
+                    return tr
+                }
+                $table.prepend(make_msg(ev.data))
+            }
+
+            socket.onclose = () => {
+                log('Disconnected')
+                socket = null
+                updateConnectionStatus()
+            }
+        }
+
+        let disconnect = () => {
+            if (socket) {
+                log('Disconnecting...')
+                socket.close()
+                socket = null
+
+                updateConnectionStatus()
+            }
+        }
+
+        // ui interact
+        $btn_send.addEventListener('click', () => {
+            let text = $chat_input.value
+            $chat_input.value = ''
+            log('sending: ' + text)
+            socket.send(text)
+        })
+
+        let updateConnectionStatus = () => {
+        }
+
+        // load at connection
+        window.addEventListener('load', connect)
+    </script>
+</body>
+
+</html>
