@@ -1,0 +1,1 @@
+./chatroom -i ./index.html -d ./static
