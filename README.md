@@ -29,7 +29,8 @@ user@user:path/to/bin$ ./chatroom -d b/statics -i a/index.html
 
 ## TODO
 
-- highly performance with rust async runtime, such as tokio
+- support: records
+- ~~highly performance with rust async runtime, such as tokio~~
 - support: upload files
 - support: image
 - support: rich-text

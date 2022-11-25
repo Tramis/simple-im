@@ -4,14 +4,14 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>chatroom</title>
 
     <link href="./static/bootstrap.min.css" rel="stylesheet">
     <script src="./static/bootstrap.min.js"></script>
 
     <style>
         .h-5 {
-            height: 5%;
+            height: 2%;
         }
     </style>
 </head>
@@ -19,10 +19,32 @@
 <body>
 
     <div class="container h-100">
+        <nav class="navbar navbar-expand-lg navbar-light bg-light">
+            <div class="container-md">
+                <div class="navbar-brand" href="#">Status</div>
+                <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                    <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                        <li class="nav-item">
+                            <div class="spinner-border" id="spin" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </li>
+                        <li class="nav-item">
+                            <a id="btn-connect" class="nav-link" href="#">connected</a>
+                        </li>
+                    </ul>
+                    <form class="d-flex">
+                        <input class="form-control me-2" type="search" placeholder="anomynous" aria-label="anomynous"
+                            id="name">
+                        <button class="btn btn-outline-success" type="submit" id="btn-name">name</button>
+                    </form>
+                </div>
+            </div>
+        </nav>
         <div class="h-5"></div>
         <div class="input-group">
-            <span class="input-group-text">With textarea</span>
-            <textarea id="chat-input" class="form-control" aria-label="With textarea"></textarea>
+            <span class="input-group-text">CHAT</span>
+            <textarea id="chat-input" class="form-control" aria-label="MSG"></textarea>
             <button id="send" class="btn btn-outline-secondary" type="button">send</button>
         </div>
         <table class="table table-success table-striped">
@@ -33,13 +55,7 @@
             </thead>
             <tbody id="table">
                 <tr>
-                    <td>Otto</td>
-                </tr>
-                <tr>
-                    <td>Thornton</td>
-                </tr>
-                <tr>
-                    <td>Larry the Bird</td>
+                    <td>Welcome here.</td>
                 </tr>
             </tbody>
         </table>
@@ -51,10 +67,30 @@
             console.log(msg)
         }
 
+        let make_color = (msg, color) => {
+            return '<font color="' + color + '">' + msg + '</font>'
+        }
+
+        const timestamp = 1301090400;
+
         // ui elements
         const $chat_input = document.querySelector('#chat-input')
         const $table = document.querySelector('#table')
         const $btn_send = document.querySelector('#send')
+        const $btn_connect = document.querySelector('#btn-connect')
+        const $spin = document.querySelector('#spin')
+        const $name_input = document.querySelector('#name')
+        const $btn_name = document.querySelector('#btn-name')
+
+        const name = {
+            _name: '',
+            set name(val) {
+                this._name = val
+            },
+            get name() {
+                return this._name == '' ? "anomynous" : this._name
+            }
+        }
 
         // websocket part
         var socket = null
@@ -64,18 +100,36 @@
             const proto = location.protocol.startsWith('https') ? 'wss' : 'ws'
             const WS_URI = `${proto}://${location.host}/ws`
 
+            if (states.connect == CONNECT_STATES.connected ||
+                states.connect == CONNECT_STATES.connecting) {
+                return
+            }
+
             log('Connecting...')
             socket = new WebSocket(WS_URI)
 
             socket.onopen = () => {
                 log('Connected')
-                updateConnectionStatus()
+
+                states.connect = CONNECT_STATES.connected
             }
 
             socket.onmessage = (ev) => {
                 let make_msg = (msg) => {
                     let tr = document.createElement("tr")
-                    tr.innerHTML = "<td> " + msg + " </td>"
+                    let time = new Date()
+                    tr.innerHTML =
+                        "<td> "
+                        + make_color(time.toLocaleDateString(), "green")
+                        + " "
+                        + make_color(time.toLocaleTimeString(), "grey")
+                        + make_color(
+                            " ["
+                            + name.name
+                            + "]", "yellow")
+                        + make_color(": ", "grey")
+                        + msg
+                        + " </td>"
                     return tr
                 }
                 $table.prepend(make_msg(ev.data))
@@ -84,7 +138,8 @@
             socket.onclose = () => {
                 log('Disconnected')
                 socket = null
-                updateConnectionStatus()
+
+                states.connect = CONNECT_STATES.disconnected
             }
         }
 
@@ -94,20 +149,55 @@
                 socket.close()
                 socket = null
 
-                updateConnectionStatus()
+                states.connect = CONNECT_STATES.disconnected
+            }
+        }
+
+        const CONNECT_STATES = {
+            disconnected: "disconnected",
+            connecting: "connecting",
+            connected: "connected"
+        }
+
+        const states = {
+            set connect(new_value) {
+                this._connect = new_value
+                switch (new_value) {
+                    case CONNECT_STATES.disconnected: {
+                        $spin.classList.add("d-none")
+                        $btn_connect.value = "disconnected"
+                        return
+                    }
+                    case CONNECT_STATES.connecting: {
+                        $spin.classList.remove("d-none")
+                        $btn_connect.value = "connecting"
+                        return
+                    }
+                    case CONNECT_STATES.connected: {
+                        $spin.classList.add("d-none")
+                        $btn_connect.value = "connected"
+                        return
+                    }
+                }
+            },
+            get connect() {
+                return this._connect
             }
         }
 
         // ui interact
         $btn_send.addEventListener('click', () => {
+            connect()
+
             let text = $chat_input.value
             $chat_input.value = ''
             log('sending: ' + text)
             socket.send(text)
         })
 
-        let updateConnectionStatus = () => {
-        }
+        $btn_name.addEventListener('click', () => {
+            name.name = $name_input.value
+        })
 
         // load at connection
         window.addEventListener('load', connect)
