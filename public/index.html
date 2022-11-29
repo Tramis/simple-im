@@ -34,9 +34,9 @@
                         </li>
                     </ul>
                     <form class="d-flex">
-                        <input class="form-control me-2" type="search" placeholder="anomynous" aria-label="anomynous"
+                        <input class="form-control me-2" placeholder="anomynous" aria-label="anomynous"
                             id="name">
-                        <button class="btn btn-outline-success" type="submit" id="btn-name">name</button>
+                        <button class="btn btn-outline-success" id="btn-name">name</button>
                     </form>
                 </div>
             </div>
@@ -186,17 +186,27 @@
         }
 
         // ui interact
-        $btn_send.addEventListener('click', () => {
+        let send = () => {
             connect()
 
             let text = $chat_input.value
             $chat_input.value = ''
             log('sending: ' + text)
             socket.send(text)
-        })
+        }
+
+        $btn_send.addEventListener('click', send)
 
         $btn_name.addEventListener('click', () => {
             name.name = $name_input.value
+        })
+
+        // key board event
+        $chat_input.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'Enter'){
+                console.log("send")
+                send()
+            }
         })
 
         // load at connection
