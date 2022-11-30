@@ -16,3 +16,5 @@ log = "*"
 log4rs = "1.2.0"
 once_cell = "1"
 serde_yaml = "*"
+
+rusqlite = "0.28"

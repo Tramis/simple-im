@@ -11,6 +11,7 @@ use actix_web_actors::ws;
 mod id;
 mod server;
 mod session;
+mod sql;
 
 use clap::Parser;
 use log::{error, info, warn};
@@ -34,7 +35,7 @@ async fn chat_route(
     )
 }
 
-fn cook_log()  {
+fn cook_log() {
     let config_str = include_str!("../config/log.yaml");
     let config = serde_yaml::from_str(config_str).unwrap();
     log4rs::init_raw_config(config).unwrap();
@@ -49,14 +50,18 @@ struct Args {
     #[arg(short, long)]
     index: String,
 
-    /// specific the static resource directory.
+    /// specify the static resource directory.
     /// such as `index.html`, `*.css` files
     #[arg(short, long)]
     directory: Vec<String>,
 
-    /// specific port to expose. default: 8080
+    /// specify the port to expose. default: 8080
     #[arg(short, long, default_value_t = 8080)]
     port: u16,
+
+    /// specify record file path to record chat log. empty for no recording
+    #[arg(short, long)]
+    record: Option<String>,
 }
 
 use once_cell::sync::OnceCell;
