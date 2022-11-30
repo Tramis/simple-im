@@ -2,6 +2,8 @@
 
 ![build](https://github.com/Tramis/simple-im/actions/workflows/rust.yml/badge.svg)
 
+- codes are basically copied from [an example of Actix repositry](https://github.com/actix/examples/tree/master/websockets/chat)
+
 just for practice
 
 not only for LAN in theory, it's just my use scene
@@ -29,8 +31,16 @@ user@user:path/to/bin$ ./chatroom -d b/statics -i a/index.html
 
 ## TODO
 
-- support: records
+- ~~support: records~~
+- support: chat rooms
 - ~~highly performance with rust async runtime, such as tokio~~
 - support: upload files
 - support: image
 - support: rich-text
+- ~~support: yaml config file~~
+
+### Small TODO
+
+- ~~complete record~~
+- rust build workflow add sqlite3
+- make runable docker file

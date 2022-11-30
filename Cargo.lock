@@ -416,11 +416,14 @@ dependencies = [
  "actix-files",
  "actix-web",
  "actix-web-actors",
+ "chrono",
  "clap",
  "log",
  "log4rs",
  "once_cell",
  "rusqlite",
+ "serde",
+ "serde_json",
  "serde_yaml 0.9.14",
 ]
 

@@ -16,9 +16,18 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+
+    - name: install build dependencies
+      run:
+        sudo apt update
+        sudo apt-get update
+        sudo apt-get -y install libsqlite3-dev
+
     - name: Build
       run: cargo build --release --verbose
+
     - name: deploy
       run: cp target/release/chatroom public/
+      
     # - name: run
     #   run: cd public/static && sh run.sh

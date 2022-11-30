@@ -99,6 +99,26 @@
         // websocket part
         var socket = null
 
+        let make_msg = (data) => {
+
+            let date_time = data.time.split(' ')
+
+            let tr = document.createElement("tr")
+            tr.innerHTML =
+                "<td> "
+                + make_color(date_time[0], "green")
+                + " "
+                + make_color(date_time[1], "grey")
+                + make_color(
+                    " ["
+                    + data.name
+                    + "]", "yellow")
+                + make_color(": ", "grey")
+                + data.content
+                + " </td>"
+            return tr
+        }
+
         let connect = () => {
             const { location } = this.window
             const proto = location.protocol.startsWith('https') ? 'wss' : 'ws'
@@ -112,31 +132,23 @@
             log('Connecting...')
             socket = new WebSocket(WS_URI)
 
+
             socket.onopen = () => {
                 log('Connected')
 
                 states.connect = CONNECT_STATES.connected
+                socket.send('/rollback')
             }
 
             socket.onmessage = (ev) => {
-                let make_msg = (msg) => {
-                    let tr = document.createElement("tr")
-                    let time = new Date()
-                    tr.innerHTML =
-                        "<td> "
-                        + make_color(time.toLocaleDateString(), "green")
-                        + " "
-                        + make_color(time.toLocaleTimeString(), "grey")
-                        + make_color(
-                            " ["
-                            + name.name
-                            + "]", "yellow")
-                        + make_color(": ", "grey")
-                        + msg
-                        + " </td>"
-                    return tr
+                let data = JSON.parse(ev.data)
+                
+                console.log(data.status)
+                if (data.status == 3) {
+                    $table.append(make_msg(data))
+                } else {
+                    $table.prepend(make_msg(data))
                 }
-                $table.prepend(make_msg(ev.data))
             }
 
             socket.onclose = () => {
@@ -204,6 +216,9 @@
         $btn_name.addEventListener('click', () => {
             name.name = $name_input.value
             log('set name to "' + name.name + '"')
+            $name_input.value = ''
+
+            socket.send('/rename ' + name.name)
         })
 
         // key board event

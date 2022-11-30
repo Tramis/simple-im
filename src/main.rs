@@ -1,7 +1,4 @@
-use std::{
-    path::{self, Path},
-    time::Instant,
-};
+use std::{path::Path, time::Instant};
 
 use actix::{Actor, Addr};
 use actix_files::{Files, NamedFile};
@@ -9,12 +6,14 @@ use actix_web::{web, App, Error, HttpRequest, HttpResponse, HttpServer, Responde
 use actix_web_actors::ws;
 
 mod id;
+mod local_time;
 mod server;
 mod session;
 mod sql;
+mod status;
 
 use clap::Parser;
-use log::{error, info, warn};
+use log::info;
 
 /// Entry point for our websocket route
 async fn chat_route(
@@ -65,6 +64,7 @@ struct Args {
 }
 
 use once_cell::sync::OnceCell;
+
 static INDEX_PATH: OnceCell<String> = OnceCell::new();
 
 #[actix_web::main]
@@ -97,6 +97,12 @@ async fn main() -> std::io::Result<()> {
         NamedFile::open_async(INDEX_PATH.get().unwrap())
             .await
             .unwrap()
+    }
+
+    // init sql
+    if let Some(path) = args.record {
+        sql::set_path(path);
+        sql::init()
     }
 
     // start chat server actor

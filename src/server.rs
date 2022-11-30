@@ -4,17 +4,17 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc, Mutex,
-    },
+    sync::{Arc, Mutex},
 };
 
-use log::{error, info, warn};
+use log::{error, info};
 
 use actix::prelude::*;
 
-use crate::id;
+use crate::{
+    id, local_time,
+    sql::{insert_1, TableRow},
+};
 
 /// Chat server sends this messages to session
 #[derive(Message)]
@@ -43,10 +43,16 @@ pub struct Disconnect {
 pub struct ClientMessage {
     /// Id of the client session
     pub id: usize,
-    /// Peer message
-    pub msg: String,
-    /// Room name
-    pub room: String,
+    /// room name
+    pub room_name: String,
+    /// timestamp
+    // pub timestamp: usize,
+    /// msg content
+    pub content: String,
+    /// sender name
+    pub name: String,
+    /// time
+    pub time: String,
 }
 
 /// List of available rooms
@@ -62,9 +68,8 @@ impl actix::Message for ListRooms {
 pub struct Join {
     /// Client ID
     pub id: usize,
-
     /// Room name
-    pub name: String,
+    pub room_name: String,
 }
 
 /// `ChatServer` manages chat rooms and responsible for coordinating chat session.
@@ -75,6 +80,7 @@ pub struct ChatServer {
     sessions: HashMap<usize, Recipient<Message>>,
     rooms: HashMap<String, HashSet<usize>>,
     id_allocator: Arc<Mutex<id::Allocator>>,
+    timestamp: usize,
 }
 
 impl ChatServer {
@@ -87,20 +93,26 @@ impl ChatServer {
             sessions: HashMap::new(),
             rooms,
             id_allocator: Arc::new(Mutex::new(id::Allocator::new())),
+            timestamp: 0,
         }
     }
 }
 
 impl ChatServer {
     /// Send message to all users in the room
-    fn send_message(&self, room: &str, message: &str) {
-        if let Some(sessions) = self.rooms.get(room) {
+    fn send_for_all(&self, room_name: &str, content: &str) {
+        if let Some(sessions) = self.rooms.get(room_name) {
             for id in sessions {
                 if let Some(addr) = self.sessions.get(id) {
-                    addr.do_send(Message(message.to_owned()));
+                    addr.do_send(Message(content.to_owned()));
                 }
             }
         }
+    }
+
+    fn stamp(&mut self) -> usize {
+        self.timestamp += 1;
+        self.timestamp
     }
 }
 
@@ -117,9 +129,9 @@ impl Actor for ChatServer {
 impl Handler<Connect> for ChatServer {
     type Result = usize;
 
-    fn handle(&mut self, msg: Connect, cx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: Connect, _cx: &mut Context<Self>) -> Self::Result {
         // notify all users in same room
-        self.send_message("main", "someone joined");
+        self.send_for_all("main", "someone joined");
 
         // register session with random id
 
@@ -171,7 +183,7 @@ impl Handler<Disconnect> for ChatServer {
         }
         // send message to other users
         for room in rooms {
-            self.send_message(&room, "someone disconnected");
+            self.send_for_all(&room, "someone disconnected");
         }
     }
 }
@@ -182,7 +194,11 @@ impl Handler<ClientMessage> for ChatServer {
 
     fn handle(&mut self, msg: ClientMessage, _: &mut Context<Self>) {
         info!("received msg from user. id: {}", msg.id);
-        self.send_message(&msg.room, msg.msg.as_str());
+        let table_row = TableRow::new(msg.name, self.stamp(), msg.content, msg.time, 0);
+
+        insert_1(&table_row);
+
+        self.send_for_all("main", &table_row.to_msg());
     }
 }
 
@@ -207,7 +223,7 @@ impl Handler<Join> for ChatServer {
     type Result = ();
 
     fn handle(&mut self, msg: Join, _: &mut Context<Self>) {
-        let Join { id, name } = msg;
+        let Join { id, room_name } = msg;
         let mut rooms = Vec::new();
 
         // remove session from all rooms
@@ -216,16 +232,35 @@ impl Handler<Join> for ChatServer {
                 rooms.push(n.to_owned());
             }
         }
+
+        let table_row_disconnect = TableRow::new(
+            "system".to_string(),
+            self.stamp(),
+            format!("id: {id} disconnected"),
+            local_time::get(),
+            2,
+        );
+        insert_1(&table_row_disconnect);
+
         // send message to other users
         for room in rooms {
-            self.send_message(&room, &format!("id: {id} disconnected"));
+            self.send_for_all(&room, &table_row_disconnect.to_msg());
         }
 
         self.rooms
-            .entry(name.clone())
+            .entry(room_name.clone())
             .or_insert_with(HashSet::new)
             .insert(id);
 
-        self.send_message(&name, &format!("id: {id} disconnected"));
+        let table_row_connect = TableRow::new(
+            "system".to_string(),
+            self.stamp(),
+            format!("id: {id} connected"),
+            local_time::get(),
+            1,
+        );
+        insert_1(&table_row_connect);
+
+        self.send_for_all(&room_name, &table_row_connect.to_msg());
     }
 }

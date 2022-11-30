@@ -3,7 +3,7 @@ use std::time::{Duration, Instant};
 use actix::prelude::*;
 use actix_web_actors::ws;
 
-use crate::server;
+use crate::{local_time, server, sql};
 
 /// How often heartbeat pings are sent
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
@@ -129,35 +129,42 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsChatSession {
                 if m.starts_with('/') {
                     let v: Vec<&str> = m.splitn(2, ' ').collect();
                     match v[0] {
-                        "/list" => {
-                            // Send ListRooms message to chat server and wait for
-                            // response
-                            println!("List rooms");
-                            self.addr
-                                .send(server::ListRooms)
-                                .into_actor(self)
-                                .then(|res, _, ctx| {
-                                    match res {
-                                        Ok(rooms) => {
-                                            for room in rooms {
-                                                ctx.text(room);
-                                            }
-                                        }
-                                        _ => println!("Something is wrong"),
+                        "/command" => {
+                            match v.get(1) {
+                                None => (),
+                                Some(&command_name) => match command_name {
+                                    "list" => {
+                                        // Send ListRooms message to chat server and wait for
+                                        // response
+                                        self.addr
+                                            .send(server::ListRooms)
+                                            .into_actor(self)
+                                            .then(|res, _, ctx| {
+                                                match res {
+                                                    Ok(rooms) => {
+                                                        for room in rooms {
+                                                            ctx.text(room);
+                                                        }
+                                                    }
+                                                    _ => println!("Something is wrong"),
+                                                }
+                                                fut::ready(())
+                                            })
+                                            .wait(ctx)
+                                        // .wait(ctx) pauses all events in context,
+                                        // so actor wont receive any new messages until it get list
+                                        // of rooms back
                                     }
-                                    fut::ready(())
-                                })
-                                .wait(ctx)
-                            // .wait(ctx) pauses all events in context,
-                            // so actor wont receive any new messages until it get list
-                            // of rooms back
+                                    _ => (),
+                                },
+                            }
                         }
                         "/join" => {
                             if v.len() == 2 {
                                 self.room = v[1].to_owned();
                                 self.addr.do_send(server::Join {
                                     id: self.id,
-                                    name: self.room.clone(),
+                                    room_name: self.room.clone(),
                                 });
 
                                 ctx.text("joined");
@@ -165,26 +172,37 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsChatSession {
                                 ctx.text("!!! room name is required");
                             }
                         }
-                        "/name" => {
-                            if v.len() == 2 {
-                                self.name = Some(v[1].to_owned());
+                        "/rollback" => {
+                            log::info!("id: {} rolling back", self.id);
+                            let backs = sql::query_10(v.get(1).map(|s| {
+                                usize::from_str_radix(s, 10).expect("invalid rollback timestamp")
+                            }));
+
+                            for back in backs {
+                                ctx.text(back.to_msg())
+                            }
+                        }
+                        "/rename" => {
+                            if v.len() == 2 && !v[1].is_empty() {
+                                log::info!("rename: [{:?}] -> [{}]", self.name, v[1]);
+                                self.name.replace(v[1].to_owned());
                             } else {
-                                ctx.text("!!! name is required");
+                                self.name.take();
                             }
                         }
                         _ => ctx.text(format!("!!! unknown command: {m:?}")),
                     }
                 } else {
-                    let msg = if let Some(ref name) = self.name {
-                        format!("{name}: {m}")
-                    } else {
-                        m.to_owned()
-                    };
                     // send message to chat server
                     self.addr.do_send(server::ClientMessage {
                         id: self.id,
-                        msg,
-                        room: self.room.clone(),
+                        name: match self.name.clone() {
+                            Some(v) => v,
+                            None => "anonymous".to_string(),
+                        },
+                        room_name: self.room.clone(),
+                        content: m.to_string(),
+                        time: local_time::get(),
                     })
                 }
             }
